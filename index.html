@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Deprem İzleyici</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 0;
@@ -30,12 +31,20 @@
     }
     section {
       padding: 1rem;
+      margin-bottom: 1rem;
+      background-color: white;
+      border-radius: 10px;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-    #map {
+    #map iframe {
       width: 100%;
       height: 300px;
+      border: none;
     }
-    iframe {
+    iframe.full {
       width: 100%;
       height: 500px;
       border: none;
@@ -61,7 +70,7 @@
 
   <section id="depremler">
     <h2>Son Depremler (Kandilli)</h2>
-    <iframe src="https://deprem.afad.gov.tr/last-earthquakes.html"></iframe>
+    <iframe class="full" src="https://deprem.afad.gov.tr/last-earthquakes.html"></iframe>
   </section>
 
   <section id="konum">
@@ -79,21 +88,64 @@
   </section>
 
   <script>
-    // Sismograf Alarm Sistemi
+    // Sismograf verileri
     let threshold = 15;
-    let alertSound = new Audio("https://www.soundjay.com/button/beep-07.wav");
+    let alertSound = new Audio("https://www.soundjay.com/button/sounds/beep-10.mp3");
     let wakeLock = null;
+    let chart, data = [], labels = [];
 
     if ('wakeLock' in navigator) {
       navigator.wakeLock.request('screen').then(lock => wakeLock = lock);
     }
 
+    function setupChart() {
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Titreşim Gücü',
+            data: data,
+            fill: false,
+            borderColor: 'red',
+            tension: 0.1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    function updateChart(val) {
+      const now = new Date();
+      if (labels.length > 30) {
+        labels.shift();
+        data.shift();
+      }
+      labels.push(now.toLocaleTimeString());
+      data.push(val);
+      chart.update();
+    }
+
     window.addEventListener("devicemotion", function (e) {
       let acc = e.accelerationIncludingGravity;
       let total = Math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2);
+      updateChart(total);
       if (total > threshold) {
         document.getElementById("alert").innerText = "⚠️ Şiddetli sarsıntı algılandı!";
         alertSound.play();
+        // Bildirim gönder
+        if (Notification.permission === 'granted') {
+          new Notification('⚠️ Deprem Uyarısı', {
+            body: 'Cihaz yüksek sarsıntı algıladı!',
+            icon: 'https://cdn-icons-png.flaticon.com/512/189/189678.png'
+          });
+        }
       }
     });
 
@@ -103,7 +155,7 @@
         navigator.geolocation.getCurrentPosition(pos => {
           let lat = pos.coords.latitude;
           let lon = pos.coords.longitude;
-          let mapFrame = `<iframe width="100%" height="300" src="https://maps.google.com/maps?q=${lat},${lon}&z=15&output=embed"></iframe>`;
+          let mapFrame = `<iframe src="https://maps.google.com/maps?q=${lat},${lon}&z=15&output=embed"></iframe>`;
           document.getElementById("map").innerHTML = mapFrame;
         });
       } else {
@@ -111,7 +163,15 @@
       }
     }
 
-    window.onload = initMap;
+    // Bildirim izni isteme
+    if (Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+
+    window.onload = function () {
+      initMap();
+      setupChart();
+    }
   </script>
 </body>
 </html>
