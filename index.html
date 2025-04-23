@@ -3,175 +3,216 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deprem İzleyici</title>
+  <title>Deprem İzleyici ve Acil Yardım</title>
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.6.8/firebase-database.js"></script>
   <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f0f2f5;
-    }
-    header {
-      background-color: #003366;
-      color: white;
-      padding: 1rem;
-      text-align: center;
-    }
-    nav {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      background-color: #00509e;
-      padding: 1rem;
-    }
-    nav a {
-      color: white;
-      text-decoration: none;
-      font-weight: bold;
-    }
-    section {
-      padding: 1rem;
-      margin-bottom: 1rem;
-      background-color: white;
-      border-radius: 10px;
-      max-width: 900px;
-      margin-left: auto;
-      margin-right: auto;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    #map iframe {
-      width: 100%;
-      height: 300px;
-      border: none;
-    }
-    iframe.full {
-      width: 100%;
-      height: 500px;
-      border: none;
-    }
+    body { margin: 0; font-family: Arial, sans-serif; background-color: #f0f2f5; color: #333; }
+    header { background-color: #003366; color: white; padding: 1rem; text-align: center; }
+    nav { display: flex; justify-content: center; gap: 1rem; background-color: #00509e; padding: 0.5rem; }
+    nav a { color: white; text-decoration: none; font-weight: bold; }
+    section { padding: 1rem; margin: 1rem auto; background: white; border-radius: 10px; max-width: 900px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    #settings-toggle { position: fixed; top: 1rem; right: 1rem; background: #00509e; color: white; border: none; padding: 0.5rem; border-radius: 5px; cursor: pointer; z-index: 1000; }
+    #settings-panel { display: none; position: fixed; top:0; right:0; width:300px; height:100%; background:white; box-shadow:-2px 0 10px rgba(0,0,0,0.2); padding:1rem; z-index:999; }
+    #chat-messages { height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 0.5rem; margin-bottom: 0.5rem; }
+    #game-canvas { border:1px solid #333; display:block; margin:0 auto; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Deprem İzleyici ve Alarm Sistemi</h1>
-  </header>
+  <header><h1>Deprem İzleyici ve Acil Yardım</h1></header>
+  <button id="settings-toggle">Ayarlar</button>
+  <div id="settings-panel">
+    <h3>Ayarlar</h3>
+    <label for="thresholdRange">Alarm Eşiği: <span id="thresholdValue">15</span></label><br/>
+    <input type="range" id="thresholdRange" min="5" max="50" value="15" /><br/><br/>
+    <label for="soundSelect">Alarm Sesi:</label><br/>
+    <select id="soundSelect">
+      <option value="beep-10.mp3">Beep</option>
+      <option value="siren.mp3">Siren</option>
+      <option value="alarm.mp3">Alarm</option>
+    </select><br/><br/>
+    <button onclick="closeSettings()">Kapat</button>
+    <button onclick="saveSettings()">Kaydet</button>
+  </div>
   <nav>
     <a href="#sismograf">Sismograf</a>
     <a href="#depremler">Son Depremler</a>
     <a href="#konum">Konumum</a>
+    <a href="#chat">Sohbet</a>
+    <a href="#game">Oyun</a>
     <a href="#acil">Acil Numaralar</a>
   </nav>
 
+  <!-- Sismograf -->
   <section id="sismograf">
     <h2>Gerçek Zamanlı Sismograf</h2>
     <canvas id="chart" width="400" height="200"></canvas>
     <p id="alert"></p>
   </section>
 
+  <!-- Depremler -->
   <section id="depremler">
-    <h2>Son Depremler (Kandilli)</h2>
+    <h2>Son Depremler (Kandilli / AFAD)</h2>
     <iframe class="full" src="https://deprem.afad.gov.tr/last-earthquakes.html"></iframe>
   </section>
 
+  <!-- Konum -->
   <section id="konum">
     <h2>Konumum</h2>
     <div id="map"></div>
   </section>
 
+  <!-- Sohbet -->
+  <section id="chat">
+    <h2>Canlı Yardım &amp; Sohbet</h2>
+    <div id="chat-messages"></div>
+    <input id="messageInput" type="text" placeholder="Mesajınızı yazın..." style="width:80%;" />
+    <button id="sendButton">Gönder</button>
+  </section>
+
+  <!-- Oyun -->
+  <section id="game">
+    <h2>Çocuklar İçin Mini Oyun</h2>
+    <canvas id="game-canvas" width="300" height="300"></canvas>
+    <p>Skor: <span id="score">0</span></p>
+  </section>
+
+  <!-- Acil Numaralar -->
   <section id="acil">
     <h2>Acil İletişim Numaraları</h2>
     <ul>
       <li>AFAD Acil Çağrı Merkezi: <strong>112</strong></li>
       <li>AFAD Genel Müdürlüğü: <strong>0 (312) 287 26 50</strong></li>
-      <li>AFAD Web Sitesi: <a href="https://www.afad.gov.tr">https://www.afad.gov.tr</a></li>
+      <li>AFAD Web: <a href="https://www.afad.gov.tr">www.afad.gov.tr</a></li>
     </ul>
   </section>
 
   <script>
-    // Sismograf verileri
-    let threshold = 15;
-    let alertSound = new Audio("https://www.soundjay.com/button/sounds/beep-10.mp3");
-    let wakeLock = null;
-    let chart, data = [], labels = [];
+    // Firebase yapılandırması
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      databaseURL: "YOUR_DB_URL",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_BUCKET",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref('chat');
 
-    if ('wakeLock' in navigator) {
-      navigator.wakeLock.request('screen').then(lock => wakeLock = lock);
-    }
-
-    function setupChart() {
-      const ctx = document.getElementById('chart').getContext('2d');
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Titreşim Gücü',
-            data: data,
-            fill: false,
-            borderColor: 'red',
-            tension: 0.1
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            y: { beginAtZero: true }
-          }
+    // Service Worker kaydı ve Periodic Sync
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        if ('periodicSync' in reg) {
+          reg.periodicSync.register('fetch-earthquakes', { minInterval: 60 * 1000 });
         }
       });
     }
 
-    function updateChart(val) {
-      const now = new Date();
-      if (labels.length > 30) {
-        labels.shift();
-        data.shift();
-      }
-      labels.push(now.toLocaleTimeString());
-      data.push(val);
-      chart.update();
+    // Wake Lock
+    if ('wakeLock' in navigator) {
+      navigator.wakeLock.request('screen');
     }
 
-    window.addEventListener("devicemotion", function (e) {
-      let acc = e.accelerationIncludingGravity;
-      let total = Math.sqrt(acc.x ** 2 + acc.y ** 2 + acc.z ** 2);
-      updateChart(total);
-      if (total > threshold) {
-        document.getElementById("alert").innerText = "⚠️ Şiddetli sarsıntı algılandı!";
+    // Sismograf grafik
+    let threshold = 15;
+    let alertSound = new Audio('beep-10.mp3');
+    const data = [], labels = [];
+    let chart;
+    function setupChart() {
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, { type:'line', data:{labels, datasets:[{label:'Titreşim', data, fill:false, borderColor:'red'}]}, options:{responsive:true, scales:{y:{beginAtZero:true}}} });
+    }
+    function updateChart(val) {
+      const now = new Date().toLocaleTimeString();
+      if (labels.length>30) { labels.shift(); data.shift(); }
+      labels.push(now); data.push(val); chart.update();
+    }
+    window.addEventListener('devicemotion', e => {
+      const acc = e.accelerationIncludingGravity || {x:0,y:0,z:0};
+      const total = Math.sqrt(acc.x**2+acc.y**2+acc.z**2);
+      if (total>0.5) updateChart(total);
+      if (total>threshold) {
+        document.getElementById('alert').innerText='⚠️ Sarsıntı!';
         alertSound.play();
-        // Bildirim gönder
-        if (Notification.permission === 'granted') {
-          new Notification('⚠️ Deprem Uyarısı', {
-            body: 'Cihaz yüksek sarsıntı algıladı!',
-            icon: 'https://cdn-icons-png.flaticon.com/512/189/189678.png'
-          });
-        }
+        if (Notification.permission==='granted') new Notification('⚠ Deprem Uyarısı',{body:'Yüksek sarsıntı tespit edildi.'});
       }
     });
 
-    // Konum Gösterme
+    // Ayarlar
+    function closeSettings(){document.getElementById('settings-panel').style.display='none'}
+    function saveSettings(){
+      threshold = +document.getElementById('thresholdRange').value;
+      document.getElementById('thresholdValue').innerText=threshold;
+      const snd = document.getElementById('soundSelect').value;
+      alertSound.src = snd;
+      closeSettings();
+    }
+    document.getElementById('settings-toggle').onclick=()=>{
+      const p = document.getElementById('settings-panel');
+      p.style.display = p.style.display==='block' ? 'none' : 'block';
+    };
+    document.getElementById('thresholdRange').oninput = e => {
+      document.getElementById('thresholdValue').innerText = e.target.value;
+    };
+
+    // Harita
     function initMap() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          let lat = pos.coords.latitude;
-          let lon = pos.coords.longitude;
-          let mapFrame = `<iframe src="https://maps.google.com/maps?q=${lat},${lon}&z=15&output=embed"></iframe>`;
-          document.getElementById("map").innerHTML = mapFrame;
-        });
-      } else {
-        document.getElementById("map").innerText = "Konum bilgisi alınamadı.";
+      if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => {
+        const f = `<iframe src="https://maps.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}&z=15&output=embed"></iframe>`;
+        document.getElementById('map').innerHTML = f;
+      }); else document.getElementById('map').innerText='Konum alınamadı.';
+    }
+
+    // Sohbet
+    const messagesEl = document.getElementById('chat-messages');
+    db.on('child_added', snap => {
+      const msg = snap.val();
+      const div = document.createElement('div');
+      div.textContent = `${msg.user}: ${msg.text}`;
+      messagesEl.append(div);
+    });
+    document.getElementById('sendButton').onclick = () => {
+      const text = document.getElementById('messageInput').value;
+      if (!text) return;
+      db.push({ user: 'Kullanıcı', text });
+      document.getElementById('messageInput').value = '';
+    };
+
+    // Mini oyun
+    const canvas = document.getElementById('game-canvas');
+    const ctx2 = canvas.getContext('2d');
+    let score = 0, x = 150, y = 150, r = 20;
+    function drawBall() {
+      ctx2.clearRect(0,0,300,300);
+      ctx2.beginPath();
+      ctx2.arc(x,y,r,0,2*Math.PI);
+      ctx2.fillStyle = 'blue';
+      ctx2.fill();
+    }
+    canvas.onclick = e => {
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      if ((mx-x)**2 + (my-y)**2 < r*r) {
+        score++;
+        document.getElementById('score').innerText = score;
+        x = Math.random()*280 + 10;
+        y = Math.random()*280 + 10;
+        drawBall();
       }
-    }
+    };
 
-    // Bildirim izni isteme
-    if (Notification.permission !== 'granted') {
-      Notification.requestPermission();
-    }
-
-    window.onload = function () {
+    // Başlangıç
+    window.onload = () => {
       initMap();
       setupChart();
-    }
+      if (Notification.permission !== 'granted') Notification.requestPermission();
+      drawBall();
+    };
   </script>
 </body>
 </html>
